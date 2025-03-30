@@ -1,113 +1,119 @@
 
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Briefcase, GraduationCap, Link as LinkIcon, Phone, Mail, Linkedin } from "lucide-react";
-
-// Sample profile data (in a real app, this would come from an API)
-const sampleProfiles = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    phone: "+1 (555) 123-4567",
-    email: "alex.johnson@example.com",
-    linkedin: "https://linkedin.com/in/alexjohnson",
-    education: [
-      { institution: "Stanford University", degree: "B.S. Computer Science", year: "2015-2019" },
-      { institution: "San Francisco State University", degree: "Associate's in Web Development", year: "2013-2015" }
-    ],
-    skills: ["JavaScript", "React", "Node.js", "TypeScript", "MongoDB", "Express", "Git", "REST APIs", "GraphQL"],
-    workExperience: [
-      { 
-        company: "Google", 
-        position: "Frontend Developer", 
-        duration: "2019 - Present",
-        description: "Developing and maintaining web applications using React.js and TypeScript. Collaborating with cross-functional teams to implement new features and improve user experience."
-      },
-      { 
-        company: "Dropbox", 
-        position: "Software Engineering Intern", 
-        duration: "Summer 2018",
-        description: "Worked on the web platform team to improve performance and accessibility of the main Dropbox web application."
-      }
-    ],
-    projects: [
-      {
-        name: "E-commerce Platform",
-        description: "Built a full-stack e-commerce platform using React, Node.js, Express, and MongoDB. Implemented features like user authentication, product catalog, shopping cart, and payment integration.",
-        link: "https://github.com/alexjohnson/ecommerce-platform"
-      },
-      {
-        name: "Weather App",
-        description: "Created a weather application that displays current weather and forecasts based on user location or search. Used React and the OpenWeatherMap API.",
-        link: "https://github.com/alexjohnson/weather-app"
-      }
-    ]
-  },
-  {
-    id: "2",
-    name: "Sarah Chen",
-    phone: "+1 (555) 987-6543",
-    email: "sarah.chen@example.com",
-    linkedin: "https://linkedin.com/in/sarahchen",
-    education: [
-      { institution: "MIT", degree: "M.S. Artificial Intelligence", year: "2018-2020" },
-      { institution: "University of Washington", degree: "B.S. Computer Science", year: "2014-2018" }
-    ],
-    skills: ["Python", "Data Science", "Machine Learning", "SQL", "TensorFlow", "PyTorch", "Data Visualization", "Statistics", "R"],
-    workExperience: [
-      { 
-        company: "Amazon", 
-        position: "Data Scientist", 
-        duration: "2020 - Present",
-        description: "Developing machine learning models to improve product recommendations. Analyzing large datasets to derive insights and inform business decisions."
-      },
-      { 
-        company: "IBM", 
-        position: "Machine Learning Intern", 
-        duration: "Summer 2019",
-        description: "Researched and implemented natural language processing techniques to improve sentiment analysis models."
-      }
-    ],
-    projects: [
-      {
-        name: "Customer Churn Prediction",
-        description: "Built a machine learning model to predict customer churn for a telecom company. Achieved 87% accuracy using ensemble methods.",
-        link: "https://github.com/sarahchen/churn-prediction"
-      },
-      {
-        name: "Image Classification System",
-        description: "Developed a convolutional neural network for classifying medical images. Implemented using PyTorch and achieved state-of-the-art results on public datasets.",
-        link: "https://github.com/sarahchen/medical-image-classifier"
-      }
-    ]
-  },
-  // Add the rest of the sample profiles here...
-];
+import { Briefcase, GraduationCap, Link as LinkIcon, Phone, Mail, Linkedin, PlusCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const ProfileDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const isOwnProfile = user?.id === id;
 
   useEffect(() => {
-    // In a real app, this would be an API call
-    const fetchProfile = () => {
+    const fetchProfile = async () => {
       setLoading(true);
-      setTimeout(() => {
-        const foundProfile = sampleProfiles.find(p => p.id === id);
-        setProfile(foundProfile || null);
+      
+      try {
+        // Fetch the basic profile data from Supabase
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        
+        if (!profileData) {
+          console.log("No profile found for ID:", id);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+        
+        // For now, create a basic profile structure with the data we have
+        // This will be expanded when we implement the full profile data model
+        const userProfile = {
+          id: profileData.id,
+          name: profileData.full_name || "No Name",
+          email: user?.email || "",
+          phone: "",
+          linkedin: "",
+          avatar_url: profileData.avatar_url,
+          headline: profileData.headline || (profileData.username ? `@${profileData.username}` : ""),
+          skills: [],
+          education: [],
+          workExperience: [],
+          projects: []
+        };
+        
+        // Temporary placeholders for demo purposes - will be replaced with real data later
+        if (userProfile.skills.length === 0) {
+          userProfile.skills = ["Add your skills"];
+        }
+        
+        if (userProfile.education.length === 0) {
+          userProfile.education = [{
+            institution: "Add your education",
+            degree: "",
+            year: ""
+          }];
+        }
+        
+        if (userProfile.workExperience.length === 0) {
+          userProfile.workExperience = [{
+            company: "Add your work experience",
+            position: "",
+            duration: "",
+            description: ""
+          }];
+        }
+        
+        if (userProfile.projects.length === 0) {
+          userProfile.projects = [{
+            name: "Add your projects",
+            description: "",
+            link: ""
+          }];
+        }
+
+        setProfile(userProfile);
+      } catch (error) {
+        console.error("Error in profile fetch:", error);
+        toast({
+          title: "Error loading profile",
+          description: "There was a problem loading the profile data.",
+          variant: "destructive"
+        });
+      } finally {
         setLoading(false);
-      }, 500); // Simulate network delay
+      }
     };
 
-    fetchProfile();
-  }, [id]);
+    if (id) {
+      fetchProfile();
+    }
+  }, [id, user, toast]);
+
+  const handleEditProfile = () => {
+    navigate("/create-profile");
+  };
 
   if (loading) {
     return (
@@ -128,10 +134,21 @@ const ProfileDetail = () => {
         <main className="flex-grow py-12">
           <div className="container mx-auto px-4 text-center">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">Profile Not Found</h1>
-            <p className="text-gray-600 mb-8">The profile you are looking for does not exist.</p>
-            <Button asChild>
-              <a href="/profiles">Browse All Profiles</a>
-            </Button>
+            <p className="text-gray-600 mb-8">
+              {isOwnProfile 
+                ? "You haven't created your profile yet." 
+                : "The profile you are looking for does not exist."}
+            </p>
+            {isOwnProfile && (
+              <Button onClick={handleEditProfile} className="bg-brand-600 hover:bg-brand-700">
+                Create Your Profile
+              </Button>
+            )}
+            {!isOwnProfile && (
+              <Button asChild>
+                <a href="/profiles">Browse All Profiles</a>
+              </Button>
+            )}
           </div>
         </main>
         <Footer />
@@ -149,14 +166,16 @@ const ProfileDetail = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{profile.name}</h1>
-                {profile.workExperience[0] && (
-                  <p className="text-gray-600 mt-2 flex items-center">
-                    <Briefcase className="h-4 w-4 mr-2" />
-                    {profile.workExperience[0].position} at {profile.workExperience[0].company}
-                  </p>
+                {profile.headline && (
+                  <p className="text-gray-600 mt-2">{profile.headline}</p>
                 )}
               </div>
               <div className="mt-4 md:mt-0 flex flex-col sm:flex-row gap-3">
+                {isOwnProfile && (
+                  <Button onClick={handleEditProfile} className="bg-brand-600 hover:bg-brand-700">
+                    Edit Profile
+                  </Button>
+                )}
                 {profile.phone && (
                   <Button variant="outline" asChild>
                     <a href={`tel:${profile.phone}`} className="flex items-center">
@@ -190,8 +209,14 @@ const ProfileDetail = () => {
             <div className="space-y-8">
               {/* Skills */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Skills</CardTitle>
+                  {isOwnProfile && (
+                    <Button variant="ghost" size="sm" onClick={handleEditProfile}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -206,8 +231,14 @@ const ProfileDetail = () => {
 
               {/* Education */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Education</CardTitle>
+                  {isOwnProfile && (
+                    <Button variant="ghost" size="sm" onClick={handleEditProfile}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {profile.education.map((edu: any, index: number) => (
@@ -216,8 +247,8 @@ const ProfileDetail = () => {
                         <GraduationCap className="h-5 w-5 text-brand-600 mt-0.5 mr-3" />
                         <div>
                           <h3 className="font-medium">{edu.institution}</h3>
-                          <p className="text-sm text-gray-600">{edu.degree}</p>
-                          <p className="text-sm text-gray-500">{edu.year}</p>
+                          {edu.degree && <p className="text-sm text-gray-600">{edu.degree}</p>}
+                          {edu.year && <p className="text-sm text-gray-500">{edu.year}</p>}
                         </div>
                       </div>
                       {index < profile.education.length - 1 && <Separator className="my-4" />}
@@ -231,8 +262,14 @@ const ProfileDetail = () => {
             <div className="md:col-span-2 space-y-8">
               {/* Work Experience */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Work Experience</CardTitle>
+                  {isOwnProfile && (
+                    <Button variant="ghost" size="sm" onClick={handleEditProfile}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {profile.workExperience.map((exp: any, index: number) => (
@@ -240,10 +277,10 @@ const ProfileDetail = () => {
                       <div className="flex items-start">
                         <Briefcase className="h-5 w-5 text-brand-600 mt-0.5 mr-3" />
                         <div>
-                          <h3 className="font-medium">{exp.position}</h3>
-                          <p className="text-sm text-gray-600">{exp.company}</p>
-                          <p className="text-sm text-gray-500">{exp.duration}</p>
-                          <p className="mt-2 text-gray-700">{exp.description}</p>
+                          <h3 className="font-medium">{exp.company}</h3>
+                          {exp.position && <p className="text-sm text-gray-600">{exp.position}</p>}
+                          {exp.duration && <p className="text-sm text-gray-500">{exp.duration}</p>}
+                          {exp.description && <p className="mt-2 text-gray-700">{exp.description}</p>}
                         </div>
                       </div>
                       {index < profile.workExperience.length - 1 && <Separator className="my-6" />}
@@ -254,8 +291,14 @@ const ProfileDetail = () => {
 
               {/* Projects */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Projects</CardTitle>
+                  {isOwnProfile && (
+                    <Button variant="ghost" size="sm" onClick={handleEditProfile}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {profile.projects.map((project: any, index: number) => (
@@ -276,7 +319,7 @@ const ProfileDetail = () => {
                               </a>
                             )}
                           </div>
-                          <p className="mt-2 text-gray-700">{project.description}</p>
+                          {project.description && <p className="mt-2 text-gray-700">{project.description}</p>}
                         </div>
                       </div>
                       {index < profile.projects.length - 1 && <Separator className="my-6" />}
