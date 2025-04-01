@@ -116,7 +116,7 @@ const Profiles = () => {
           const transformedProfiles = data.map(profile => {
             return {
               id: profile.id,
-              name: profile.full_name || profile.username || "Unknown",
+              name: profile.full_name || profile.username || "Unknown User", // Ensure name is always set
               full_name: profile.full_name,
               username: profile.username,
               headline: profile.headline,
@@ -195,7 +195,7 @@ const Profiles = () => {
         const transformedResults = response.data.profiles.map((profile: any) => {
           return {
             id: profile.id,
-            name: profile.full_name || profile.username || "Unknown",
+            name: profile.full_name || profile.username || "Unknown User", // Ensure name is always set
             full_name: profile.full_name,
             username: profile.username,
             headline: profile.headline,

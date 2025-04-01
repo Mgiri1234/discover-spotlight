@@ -7,17 +7,22 @@ import { Link } from "react-router-dom";
 
 interface ProfileCardProps {
   id: string;
-  name: string;
-  skills: string[];
+  name: string; // This is required
+  skills?: string[]; // Made optional to match how it's being used
   topEducation?: { institution: string; degree: string };
   topExperience?: { company: string; position: string };
   linkedin?: string;
+  // Additional optional props from profiles
+  full_name?: string;
+  username?: string;
+  headline?: string;
+  avatar_url?: string;
 }
 
 const ProfileCard = ({
   id,
   name,
-  skills,
+  skills = [], // Provide default empty array
   topEducation,
   topExperience,
   linkedin,
