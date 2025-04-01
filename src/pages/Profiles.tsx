@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -5,7 +6,7 @@ import ProfileCard from "@/components/ProfileCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, extractSkillsFromHeadline } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Command,
@@ -113,6 +114,9 @@ const Profiles = () => {
         } else if (data && data.length > 0) {
           // Transform Supabase profiles to match our format
           const transformedProfiles = data.map(profile => {
+            // Extract skills from headline using the helper function
+            const extractedSkills = extractSkillsFromHeadline(profile.headline);
+            
             return {
               id: profile.id,
               name: profile.full_name || profile.username || "Unknown User", // Ensure name is always set
@@ -120,8 +124,8 @@ const Profiles = () => {
               username: profile.username,
               headline: profile.headline,
               avatar_url: profile.avatar_url,
-              // Generate sample skills until we have real data
-              skills: ["Profile Management", "Networking", "Professional Development"],
+              // Use extracted skills or provide fallbacks
+              skills: extractedSkills.length > 0 ? extractedSkills : ["Profile Management", "Networking", "Professional Development"],
               topEducation: { institution: "Add your education", degree: "Your degree" },
               topExperience: { company: "Add your experience", position: "Your position" },
               linkedin: "Add your LinkedIn",

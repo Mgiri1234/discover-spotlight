@@ -9,3 +9,38 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Helper function to extract skills from headline
+export const extractSkillsFromHeadline = (headline?: string): string[] => {
+  if (!headline) return [];
+  
+  // Look for skills after a pipe character (common format in professional headlines)
+  const pipeSplit = headline.split('|');
+  
+  if (pipeSplit.length > 1) {
+    // If headline contains pipe characters, extract skills from after the first pipe
+    return pipeSplit.slice(1)
+      .flatMap(section => section.split(','))
+      .map(skill => skill.trim())
+      .filter(skill => skill.length > 0 && !skill.includes('years') && !skill.includes('experience'));
+  } else {
+    // Otherwise, try to extract common tech keywords
+    const techKeywords = [
+      'JavaScript', 'TypeScript', 'React', 'Angular', 'Vue', 'Node', 'Python', 
+      'Java', 'Spring', 'C#', 'C++', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 
+      'Kotlin', 'SQL', 'MongoDB', 'PostgreSQL', 'MySQL', 'DevOps', 'Docker', 
+      'Kubernetes', 'AWS', 'Azure', 'GCP', 'HTML', 'CSS', 'Sass', 'LESS',
+      'Next.js', 'Gatsby', 'GraphQL', 'REST', 'API', 'UI/UX', 'Design',
+      'Testing', 'CI/CD', 'Git', 'Agile', 'Scrum', 'Frontend', 'Backend',
+      'Full Stack', 'Mobile', 'iOS', 'Android', 'Xamarin', 'Flutter',
+      'React Native', 'Unity', 'Unreal', 'Game', 'Blockchain', 'Solidity',
+      'Ethereum', 'Web3', 'Machine Learning', 'AI', 'Data Science'
+    ];
+    
+    const foundSkills = techKeywords.filter(keyword => 
+      headline.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    return foundSkills.length > 0 ? foundSkills : ['Development'];
+  }
+};
