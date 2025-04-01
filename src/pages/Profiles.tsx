@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -325,9 +324,14 @@ const Profiles = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayProfiles.map((profile) => (
-                <ProfileCard key={profile.id} {...profile} />
-              ))}
+              {displayProfiles.map((profile) => {
+                // Ensure name is always defined, using fallbacks if needed
+                const profileWithRequiredProps = {
+                  ...profile,
+                  name: profile.name || profile.full_name || profile.username || "Unknown User"
+                };
+                return <ProfileCard key={profile.id} {...profileWithRequiredProps} />;
+              })}
             </div>
           )}
 
