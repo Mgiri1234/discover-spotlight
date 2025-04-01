@@ -101,80 +101,82 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
 
     const geminiData = await geminiResponse.json();
     console.log("Gemini API response received");
-
-    // Extract the response text from Gemini
-    let responseText = "";
-    try {
-      responseText = geminiData.candidates[0].content.parts[0].text;
-      console.log("Gemini response text:", responseText);
-      
-      // Try to parse the JSON array from the response
-      // It might be surrounded by backticks or other text
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      let profileIds = [];
-      
-      if (jsonMatch) {
-        try {
-          profileIds = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          console.error("Error parsing JSON from matched string:", e);
-        }
-      } else {
-        // Fallback: try to extract IDs individually
-        const idMatches = responseText.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g);
-        profileIds = idMatches || [];
-      }
-      
-      // If we found profile IDs, fetch the complete profiles
-      if (profileIds.length > 0) {
-        const { data: matchedProfiles, error: matchError } = await supabase
-          .from("profiles")
-          .select("*")
-          .in("id", profileIds);
-          
-        if (matchError) {
-          console.error("Error fetching matched profiles:", matchError);
-          return new Response(
-            JSON.stringify({ error: "Failed to fetch matched profiles" }),
-            { 
-              status: 500, 
-              headers: { ...corsHeaders, "Content-Type": "application/json" } 
-            }
-          );
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            profiles: matchedProfiles,
-            query,
-            reasoning: responseText 
-          }),
-          { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
-          }
-        );
-      } else {
-        // If no profiles matched, return an empty array
-        return new Response(
-          JSON.stringify({ 
-            profiles: [],
-            query, 
-            reasoning: responseText 
-          }),
-          { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
-          }
-        );
-      }
-    } catch (error) {
-      console.error("Error processing Gemini response:", error);
+    
+    // Check if we have a valid response from Gemini
+    if (!geminiData || !geminiData.candidates || !geminiData.candidates[0] || !geminiData.candidates[0].content) {
+      console.error("Invalid Gemini API response structure:", JSON.stringify(geminiData));
       return new Response(
         JSON.stringify({ 
-          error: "Failed to process AI response",
-          details: error.message 
+          error: "Invalid response from AI service",
+          details: geminiData.error ? geminiData.error.message : "Unknown error" 
         }),
         { 
           status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    // Extract the response text from Gemini
+    const responseText = geminiData.candidates[0].content.parts[0].text;
+    console.log("Gemini response text:", responseText);
+      
+    // Try to parse the JSON array from the response
+    // It might be surrounded by backticks or other text
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    let profileIds = [];
+    
+    if (jsonMatch) {
+      try {
+        profileIds = JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.error("Error parsing JSON from matched string:", e);
+      }
+    } 
+    
+    // Fallback: try to extract IDs individually if JSON parsing failed
+    if (profileIds.length === 0) {
+      const idMatches = responseText.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g);
+      profileIds = idMatches || [];
+    }
+    
+    // If we found profile IDs, fetch the complete profiles
+    if (profileIds.length > 0) {
+      const { data: matchedProfiles, error: matchError } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", profileIds);
+        
+      if (matchError) {
+        console.error("Error fetching matched profiles:", matchError);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch matched profiles" }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          profiles: matchedProfiles,
+          query,
+          reasoning: responseText 
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    } else {
+      // If no profiles matched, return an empty array
+      return new Response(
+        JSON.stringify({ 
+          profiles: [],
+          query, 
+          reasoning: responseText 
+        }),
+        { 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
