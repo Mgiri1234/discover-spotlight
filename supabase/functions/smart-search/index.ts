@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.36.0";
 
@@ -68,9 +67,12 @@ serve(async (req) => {
     }
 
     // Format profiles data for Gemini prompt
-    const profilesContext = profiles.map(profile => 
-      `ID: ${profile.id}, Name: ${profile.full_name || "Unknown"}, Username: ${profile.username || "Unknown"}, Headline: ${profile.headline || "Unknown"}`
-    ).join("\n");
+    const profilesContext = profiles.map(profile => {
+      // Extract skills from headline 
+      const skills = extractSkillsFromHeadline(profile.headline);
+      
+      return `ID: ${profile.id}, Name: ${profile.full_name || "Unknown"}, Username: ${profile.username || "Unknown"}, Headline: ${profile.headline || "Unknown"}, Skills: ${skills.join(", ")}`;
+    }).join("\n");
 
     // Construct the prompt for Gemini
     const prompt = `
@@ -82,6 +84,7 @@ The user is searching for: "${query}"
 
 Based on the search query and the available profiles, return a JSON array of profile IDs that match the search criteria.
 Only include profile IDs that are relevant to the search query. 
+Pay special attention to skills mentioned in the query and match them against the skills listed for each profile.
 Your response should be in this format: ["profile_id_1", "profile_id_2"]
 `;
 
@@ -118,17 +121,10 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
         const errorData = await geminiResponse.json();
         console.error("Gemini API error:", errorData);
         
-        // Fallback to keyword-based matching
-        console.log("Falling back to keyword-based search");
-        const matchedProfiles = profiles.filter(profile => {
-          const searchLower = query.toLowerCase();
-          return (
-            (profile.full_name?.toLowerCase().includes(searchLower)) ||
-            (profile.username?.toLowerCase().includes(searchLower)) ||
-            (profile.headline?.toLowerCase().includes(searchLower))
-          );
-        });
-
+        // Fallback to enhanced keyword-based matching
+        console.log("Falling back to enhanced keyword-based search");
+        const matchedProfiles = findProfilesByKeywords(profiles, query);
+        
         return new Response(
           JSON.stringify({ 
             profiles: matchedProfiles,
@@ -148,17 +144,10 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
       if (!geminiData || !geminiData.candidates || geminiData.candidates.length === 0) {
         console.error("Invalid Gemini API response structure:", JSON.stringify(geminiData));
         
-        // Fallback to keyword-based matching
-        console.log("Falling back to keyword-based search due to invalid response");
-        const matchedProfiles = profiles.filter(profile => {
-          const searchLower = query.toLowerCase();
-          return (
-            (profile.full_name?.toLowerCase().includes(searchLower)) ||
-            (profile.username?.toLowerCase().includes(searchLower)) ||
-            (profile.headline?.toLowerCase().includes(searchLower))
-          );
-        });
-
+        // Fallback to enhanced keyword-based matching
+        console.log("Falling back to enhanced keyword-based search due to invalid response");
+        const matchedProfiles = findProfilesByKeywords(profiles, query);
+        
         return new Response(
           JSON.stringify({ 
             profiles: matchedProfiles,
@@ -176,17 +165,10 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
       if (!candidate || !candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
         console.error("Missing content in Gemini response:", JSON.stringify(geminiData));
         
-        // Fallback to keyword-based matching
-        console.log("Falling back to keyword-based search due to missing content");
-        const matchedProfiles = profiles.filter(profile => {
-          const searchLower = query.toLowerCase();
-          return (
-            (profile.full_name?.toLowerCase().includes(searchLower)) ||
-            (profile.username?.toLowerCase().includes(searchLower)) ||
-            (profile.headline?.toLowerCase().includes(searchLower))
-          );
-        });
-
+        // Fallback to enhanced keyword-based matching
+        console.log("Falling back to enhanced keyword-based search due to missing content");
+        const matchedProfiles = findProfilesByKeywords(profiles, query);
+        
         return new Response(
           JSON.stringify({ 
             profiles: matchedProfiles,
@@ -250,16 +232,9 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
           }
         );
       } else {
-        // Fallback to keyword-based matching if no profiles matched
-        console.log("No AI matches found, falling back to keyword-based search");
-        const matchedProfiles = profiles.filter(profile => {
-          const searchLower = query.toLowerCase();
-          return (
-            (profile.full_name?.toLowerCase().includes(searchLower)) ||
-            (profile.username?.toLowerCase().includes(searchLower)) ||
-            (profile.headline?.toLowerCase().includes(searchLower))
-          );
-        });
+        // Fallback to enhanced keyword-based matching if no profiles matched
+        console.log("No AI matches found, falling back to enhanced keyword-based search");
+        const matchedProfiles = findProfilesByKeywords(profiles, query);
         
         return new Response(
           JSON.stringify({ 
@@ -275,16 +250,9 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
     } catch (geminiError) {
       console.error("Error calling Gemini API:", geminiError);
       
-      // Fallback to keyword-based matching
-      console.log("Falling back to keyword-based search due to API error");
-      const matchedProfiles = profiles.filter(profile => {
-        const searchLower = query.toLowerCase();
-        return (
-          (profile.full_name?.toLowerCase().includes(searchLower)) ||
-          (profile.username?.toLowerCase().includes(searchLower)) ||
-          (profile.headline?.toLowerCase().includes(searchLower))
-        );
-      });
+      // Fallback to enhanced keyword-based matching
+      console.log("Falling back to enhanced keyword-based search due to API error");
+      const matchedProfiles = findProfilesByKeywords(profiles, query);
       
       return new Response(
         JSON.stringify({ 
@@ -308,3 +276,63 @@ Your response should be in this format: ["profile_id_1", "profile_id_2"]
     );
   }
 });
+
+// Helper function to extract skills from headline
+function extractSkillsFromHeadline(headline?: string): string[] {
+  if (!headline) return [];
+  
+  // Look for skills after a pipe character (common format in professional headlines)
+  const pipeSplit = headline.split('|');
+  
+  if (pipeSplit.length > 1) {
+    // If headline contains pipe characters, extract skills from after the first pipe
+    return pipeSplit.slice(1)
+      .flatMap(section => section.split(','))
+      .map(skill => skill.trim())
+      .filter(skill => skill.length > 0 && !skill.includes('years') && !skill.includes('experience'));
+  } else {
+    // Otherwise, try to extract common tech keywords
+    const techKeywords = [
+      'JavaScript', 'TypeScript', 'React', 'Angular', 'Vue', 'Node', 'Python', 
+      'Java', 'Spring', 'C#', 'C++', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 
+      'Kotlin', 'SQL', 'MongoDB', 'PostgreSQL', 'MySQL', 'DevOps', 'Docker', 
+      'Kubernetes', 'AWS', 'Azure', 'GCP', 'HTML', 'CSS', 'Sass', 'LESS',
+      'Next.js', 'Gatsby', 'GraphQL', 'REST', 'API', 'UI/UX', 'Design',
+      'Testing', 'CI/CD', 'Git', 'Agile', 'Scrum', 'Frontend', 'Backend',
+      'Full Stack', 'Mobile', 'iOS', 'Android', 'Xamarin', 'Flutter',
+      'React Native', 'Unity', 'Unreal', 'Game', 'Blockchain', 'Solidity',
+      'Ethereum', 'Web3', 'Machine Learning', 'AI', 'Data Science'
+    ];
+    
+    const foundSkills = techKeywords.filter(keyword => 
+      headline.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    return foundSkills.length > 0 ? foundSkills : ['Development'];
+  }
+}
+
+// Enhanced keyword matching function that checks for skills in headlines and other profile data
+function findProfilesByKeywords(profiles, query) {
+  const searchTerms = query.toLowerCase().split(/\s+/);
+  
+  return profiles.filter(profile => {
+    // Extract skills from the headline
+    const skills = extractSkillsFromHeadline(profile.headline || "").map(skill => skill.toLowerCase());
+    
+    // Check if any search term matches with any skill
+    const hasMatchingSkill = searchTerms.some(term => 
+      skills.some(skill => skill.includes(term))
+    );
+    
+    // Check if any search term matches with name, username, or headline
+    const hasMatchingText = searchTerms.some(term => 
+      (profile.full_name?.toLowerCase().includes(term)) ||
+      (profile.username?.toLowerCase().includes(term)) ||
+      (profile.headline?.toLowerCase().includes(term))
+    );
+    
+    // Return true if either skills or text fields match
+    return hasMatchingSkill || hasMatchingText;
+  });
+}
