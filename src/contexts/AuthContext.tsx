@@ -11,6 +11,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  isAdmin: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -28,6 +30,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Auth state changed:", event, currentSession?.user?.email);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        
+        // Check if the user is an admin (for future use)
+        if (currentSession?.user) {
+          setIsAdmin(currentSession.user.email === "admin@example.com");
+        } else {
+          setIsAdmin(false);
+        }
         
         if (event === 'SIGNED_IN') {
           toast({
@@ -52,6 +61,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setSession(data.session);
         setUser(data.session?.user ?? null);
+        
+        // Check if the user is an admin
+        if (data.session?.user) {
+          setIsAdmin(data.session.user.email === "admin@example.com");
+        }
       } catch (error) {
         console.error("Unexpected error during getSession:", error);
       } finally {
@@ -152,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        isAdmin,
       }}
     >
       {children}
